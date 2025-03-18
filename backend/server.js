@@ -1,3 +1,4 @@
+//server.js
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
@@ -17,43 +18,71 @@ mongoose
   .then(() => console.log("MongoDB connected"))
   .catch((err) => console.error("MongoDB connection error:", err));
 
-// Define Mongoose Schema
-const foodSchema = new mongoose.Schema({
+// Define Mongoose Schemas
+
+const foodItemSchema = new mongoose.Schema({
   name: String,
   quantity: Number,
-  location: String,
-  donor: String,
-  expiry: String,
+  isVeg: Boolean,
+  serves: Number,
+  consumeWithin: Number,
 });
 
-const Food = mongoose.model("Food", foodSchema);
+const donorSchema = new mongoose.Schema({
+  name: String,
+  contact: String,
+  address: String,
+  foodItems: [foodItemSchema], // Array of food items donated
+});
 
-// Get all food items
+const Donor = mongoose.model("Donor", donorSchema);
+
+// Get all donations
 app.get("/food", async (req, res) => {
   try {
-    const foodItems = await Food.find();
-    res.json(foodItems);
+    const donations = await Donor.find();
+    res.json(donations);
   } catch (error) {
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
-// Add a new food item
+// Add a new donation
 app.post("/food", async (req, res) => {
-  const { name, quantity, location, donor, expiry } = req.body;
-  if (!name || !quantity || !location || !donor || !expiry) {
-    return res.status(400).json({ error: "All fields are required" });
-  }
+    try {
+      console.log("Received Data:", req.body); // Log incoming request
+  
+      const { donorInfo, foodItems } = req.body;
+  
+      // Validate request body
+      if (!donorInfo || !donorInfo.name || !donorInfo.contact || !donorInfo.address || !foodItems || !foodItems.length) {
+        return res.status(400).json({ error: "Invalid donation details" });
+      }
+  
+      // Create and save new donation
+      const newDonation = new Donor({
+        name: donorInfo.name,
+        contact: donorInfo.contact,
+        address: donorInfo.address,
+        foodItems: foodItems.map((item) => ({
+          name: item.name,
+          quantity: item.quantity,
+          isVeg: item.isVeg,
+          serves: item.serves,
+          consumeWithin: item.consumeWithin,
+        })),
+      });
+  
+      const savedDonation = await newDonation.save();
+      res.status(201).json(savedDonation);
+    } catch (error) {
+      console.error("Error saving donation:", error); // Log error details
+      res.status(500).json({ error: "Error saving donation" });
+    }
+  });
+  
 
-  try {
-    const foodItem = new Food({ name, quantity, location, donor, expiry });
-    await foodItem.save();
-    res.status(201).json(foodItem);
-  } catch (error) {
-    res.status(500).json({ error: "Error saving food item" });
-  }
-});
-
+// Start the server
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });
